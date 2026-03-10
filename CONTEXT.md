@@ -15,8 +15,9 @@ alwaysApply: true
 Автономный дрон для инвентаризации склада. Летит по проходу между стеллажами,
 считывает штрихкоды, возвращается на базу.
 
-**MVP-цель (Phase 0):** дрон в симуляции Gazebo Harmonic влетает в один проход
-18м длиной, считывает ≥80% штрихкодов с двух стеллажей и возвращается на старт.
+**MVP-цель (Phase 0c):** дрон в симуляции Gazebo Harmonic влетает в один проход
+18м длиной, считывает ≥80% штрихкодов с двух стеллажей (≥38 из 48)
+и возвращается на старт. Достигается через три подфазы: 0a → 0b → 0c.
 
 **Принцип:** три независимых контура — каждый тестируется отдельно.
 Следующий контур добавляется только после стабилизации предыдущего.
@@ -870,6 +871,18 @@ gz sim simulation/worlds/warehouse_phase0.sdf
 
 ## 9. PHASE 0 ROADMAP
 
+### Phase 0a — Stable flight
+- **Цель:** дрон летит вдоль прохода 18м без краша
+- **Go-критерий:** lateral_error_rms < 0.10м, 0 watchdog events за прогон
+
+### Phase 0b — Single-side scan
+- **Цель:** считать штрихкоды одной стороны прохода
+- **Go-критерий:** ≥10 из 24 слотов считаны за один пролёт (левая сторона)
+
+### Phase 0c — Full aisle scan + return
+- **Цель:** обе стороны + возврат на dock
+- **Go-критерий:** success_rate ≥ 0.80 по итогам 10 прогонов → переход в Phase 1
+
 ### Неделя 1 — Фундамент
 ```
 [ ] WSL2 + Ubuntu 22.04 настроен
@@ -941,6 +954,9 @@ NO-GO: success_rate ≤ 0.80 → найти узкое место через KPI
 | Handover вызывает рывок | Nav2 не отменён, борьба velocity commanders | Обязательно cancel Nav2 action перед активацией RackFollower |
 | Barcode reads wrong aisle | Perceptual aliasing идентичных проходов | Barcode-first relocalization, не ORB features |
 | Батарея садится в проходе | Статический порог не учитывает расстояние | Dynamic budget, пересчёт каждые 5с |
+| FSM ADJUSTING не влияет на движение | target_distance_adjust не подключён к rack_follower | Подписать rack_follower на топик adjust, clamp [0.4, 1.4]м |
+| Phase C зависит от SLAM pose | scan_policy_fsm использует /drone/slam/pose для слотов | Заменить на dead-reckoning по cmd_vel до появления SLAM в Phase D |
+| Барcode KPI считает только левую сторону | slot_id хардкодит "L_" префикс | Phase 0b — только L сторона (параметр scan_side), Phase 0c — добавить R |
 
 ---
 

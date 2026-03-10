@@ -16,9 +16,10 @@ scan_policy_fsm_node:
     min_slot_dwell_sec: 1.0       # wait before judging scan quality
 
     # --- aisle geometry ---
-    aisle_start_x: -9.0
-    aisle_end_x: 9.0
-    slot_width_m: 1.5
+    aisle_length_m: 18.0
+    section_step_m: 1.5
+    scan_side: "L"
+    aisle_end_threshold_m: 17.5
     aisle_id: "aisle_0"
 
     # --- approach ---

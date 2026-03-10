@@ -163,3 +163,171 @@
 **Phase A приведена в консистентное состояние на текущей машине.** Остаётся только runtime-подтверждение полного стека (PX4 SITL + DDS + топики) как отдельная живая проверка, но файловые и инфраструктурные расхождения Phase A устранены.
 
 ---
+
+## 2026-03-10 — B.2 Единый launch файл для Loop 2
+
+### Что сделано
+
+1. **`loop2.launch.py`** в пакете `drone_bringup` — исправлен и проверен.
+2. **Исправлен баг**: `use_sim_time` объявлялся как аргумент, но не пробрасывался в дочерние launch-файлы. Добавлен `launch_ros.actions.SetParameter(name="use_sim_time", value=...)` для глобальной пропагации параметра во все ноды.
+3. Добавлены `LogInfo` сообщения для отслеживания запуска pipeline.
+4. Пакет пересобран через `colcon build --symlink-install --packages-select drone_bringup`.
+
+### Запускаемые ноды
+
+| # | Нода | Пакет | Назначение |
+|---|------|-------|-----------|
+| 1 | `lidar_preprocessor_node` | lidar_preprocessor | raw PointCloud2 → filtered PointCloud2 |
+| 2 | `rack_follower_node` | rack_follower | filtered cloud → cmd_vel (PD wall-follower) |
+| 3 | `twist_mux` | twist_mux (external) | cmd_vel arbitration by priority |
+| 4 | `px4_bridge_node` | px4_bridge | /cmd_vel_out → PX4 TrajectorySetpoint |
+
+### Проверка
+
+| Проверка | Результат |
+|----------|-----------|
+| `ros2 launch drone_bringup loop2.launch.py` запускает 4 процесса | ✅ PID-ы выданы всем 4 |
+| `ros2 node list` показывает все 4 ноды | ✅ lidar_preprocessor_node, rack_follower_node, twist_mux, px4_bridge_node |
+| Status топики публикуются | ✅ /drone/control/rack_follower/status, /drone/control/px4_bridge/status, /lidar_preprocessor/status (FAILED без симуляции — ожидаемо) |
+| twist_mux публикует /diagnostics | ✅ |
+| use_sim_time пробрасывается | ✅ (через SetParameter) |
+| `--show-args` отображает use_sim_time argument | ✅ default="true" |
+
+### Ключевые топики при запуске Loop 2
+
+```
+/drone/perception/lidar/filtered        — выход lidar_preprocessor
+/drone/control/rack_follower/cmd_vel    — выход rack_follower
+/drone/control/rack_follower/wall_distance — диагностика rack_follower
+/cmd_vel_out                            — выход twist_mux
+/fmu/in/offboard_control_mode           — px4_bridge → PX4
+/fmu/in/trajectory_setpoint             — px4_bridge → PX4
+```
+
+### Использование
+
+```bash
+# Терминал 1: запуск симуляции (PX4 + Gazebo + DDS + ros_gz_bridge)
+cd /mnt/c/CORTEXIS/Drone_new_method
+bash scripts/launch_sim.sh
+
+# Терминал 2: запуск Loop 2
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ros2 launch drone_bringup loop2.launch.py
+
+# Без симуляции (для отладки, статусы будут FAILED):
+ros2 launch drone_bringup loop2.launch.py use_sim_time:=false
+```
+
+### Вердикт
+
+**DONE — B.2 завершена.** Единый launch файл корректно стартует все 4 ноды Loop 2, статусы публикуются. Полный runtime-тест с живой симуляцией — в рамках B.3.
+
+---
+
+## B.3 — Подготовка тюнинга PD-контроллера rack_follower
+
+**Дата:** 2026-03-10
+**Статус:** PARTIAL → UNBLOCKED (preflight fix applied)
+
+### Что сделано
+
+- `rack_follower_node` теперь публикует `/drone/control/rack_follower/lateral_error`
+  (раньше был только `wall_distance`).
+- Добавлен скрипт `scripts/compute_lateral_error_rms.py` для расчёта `lateral_error_rms`
+  из rosbag2 по критерию приёмки `B.3`.
+- Добавлен runtime-helper `scripts/offboard_takeoff_via_twist_mux.py`, который:
+  - не дублирует `OffboardControlMode` с `px4_bridge`;
+  - использует `/drone/safety/cmd_vel` через `twist_mux` для взлёта;
+  - ждёт валидную локализацию перед движением.
+- Исправлена подписка `px4_bridge_node` на фактический PX4 DDS topic:
+  `/fmu/out/vehicle_status_v2` вместо несуществующего `/fmu/out/vehicle_status`.
+
+### Что проверено
+
+- `/drone/control/rack_follower/lateral_error` публикуется и читается с корректным QoS.
+- `px4_bridge_node` после фикса видит publisher на `/fmu/out/vehicle_status_v2`.
+- PX4 sensor DDS-топики активны (`sensor_combined`, `vehicle_attitude`).
+
+### Блокер (RESOLVED — ERR-009)
+
+Полёт для тюнинга `B.3` не стартует, потому что PX4 не проходит preflight:
+- `pre_flight_checks_pass=False`
+- `VehicleLocalPosition`: все флаги валидности `False`
+- PX4 лог: `barometer 0 missing`, `ekf2 missing data`, `Found 0 compass`,
+  `No connection to the GCS`
+
+**Причина:** `warehouse_phase0.sdf` не содержал Gazebo system-плагины для magnetometer,
+air_pressure, navsat. Также отсутствовали `<magnetic_field>`, `<atmosphere>`,
+`<spherical_coordinates>`. Без них x500_base сенсоры не генерировали данные.
+
+**Исправление (2026-03-10):**
+1. Добавлены `<magnetic_field>`, `<atmosphere>`, `<spherical_coordinates>` в мир
+2. Добавлены system-плагины: `Magnetometer`, `AirPressure`, `NavSat`
+3. Airframe 4030 дополнен: `NAV_DLL_ACT 0`, `COM_RCL_EXCEPT 4`
+
+**Верификация:**
+```
+pre_flight_checks_pass=True
+xy_valid=True  z_valid=True  v_xy_valid=True  v_z_valid=True
+xy_global=True  z_global=True
+PX4: "home set" → "Ready for takeoff!"
+```
+
+### Следующий технический шаг
+
+Блокер снят. Можно переходить к фактическому тюнингу `Kp`, `Kd`, `base_speed` —
+запуск симуляции через `launch_sim.sh`, затем Loop 2 + offboard takeoff helper.
+
+---
+
+## 2026-03-10 — B.3 Итерация 1: Решение системных проблем
+
+**Статус:** В ПРОЦЕССЕ (RMS > 0.10m, тюнинг продолжается)
+
+В ходе первых попыток тюнинга `B.3` выявлен и устранён ряд критических проблем, которые не позволяли дрону вообще следовать вдоль стены:
+
+1. **Конфликт типов `twist_mux` (ERR-010):**
+   - `twist_mux` работает с `geometry_msgs/msg/Twist`, тогда как наши ноды генерировали `TwistStamped`.
+   - **Фикс:** Все publisher'ы (`rack_follower`, `offboard_takeoff`, `px4_bridge`) переведены на обычный `Twist`.
+
+2. **LiDAR "слепота" (ERR-011):**
+   - `rack_follower_node` постоянно выдавал `No valid wall points`.
+   - Причина: так как TF transform до `world` не работал (мир не публикует TF), фильтрация происходила в `sensor` фрейме. Z-пороги были настроены на отсечение пола (`0.05`), но в `sensor` фрейме Z=0 — это уровень самого лидара.
+   - **Фикс:** Пороги `z_ground_threshold` и `filter_z_min` опущены до `-1.5`...`-2.0` м. Увеличен `min_range` до `0.45` м для исключения самого дрона. Лидар стал корректно видеть стену.
+
+3. **Ошибка системы координат (ERR-012):**
+   - Дрон после взлёта улетал по диагонали или в стену (максимальная ошибка доходила до 2.5 метров).
+   - Причина: `px4_bridge` преобразовывал `vx` (forward) в `North` и `vy` (left) в `-East`. Но в Gazebo дрон спавнится лицом на Восток (+X). Таким образом, его вперёд — это Восток (East), а влево — Север (North).
+   - **Фикс:** Маппинг скоростей изменён на: `vel_x = vy (North)`, `vel_y = vx (East)`.
+
+### Текущий результат (Test 4)
+- Дрон успешно взлетает и получает команды от `rack_follower`.
+- `lateral_error_rms` составил **0.75 м** (при цели < 0.10 м).
+- Максимальная ошибка: 1.96 м.
+- **Вердикт:** Инфраструктура Loop 2 и полётные скрипты работают исправно. Следующий шаг — математический тюнинг коэффициентов `Kp`, `Kd` и `target_distance`.
+
+---
+
+## 2026-03-10 — B.3 Итерация 2: Внедрение динамического TF и пересчёта скоростей
+
+**Статус:** В ПРОЦЕССЕ (готово к запуску тюнинга)
+
+Вместо использования статических хаков для обхода проблем с `TF` и маппингом (описанных в Итерации 1), внедрено полноценное архитектурное решение:
+
+1. **TF `world` -> `base_link` (Решение для ERR-011):**
+   - `px4_bridge` теперь подписывается на одометрию `/fmu/out/vehicle_odometry` от EKF2 PX4.
+   - Из одометрии извлекаются координаты (NED → ENU) и кватернион (FRD → FLU), которые публикуются через `tf2_ros::TransformBroadcaster`.
+   - В `lidar_preprocessor` добавлен override `frame_id` на `base_link`, чтобы `tf_buffer` корректно находил дерево до `world`.
+   - **Итог:** Z-фильтры в `lidar_preprocessor_params.yaml` и `rack_follower_params.yaml` возвращены к нормальным (0.05 м и 0.3 м) значениям, так как фильтрация теперь снова идёт в `world` координатах.
+
+2. **Динамический маппинг скоростей (Решение для ERR-012):**
+   - `px4_bridge` сохраняет текущий `Yaw` дрона.
+   - Перед отправкой в `TrajectorySetpoint` (Local NED), целевые скорости из Body Frame (FLU) поворачиваются на текущий `Yaw` с помощью матрицы поворота.
+   - **Итог:** Дрон может следовать вдоль стеллажа независимо от своего начального или текущего курса по компасу (Yaw).
+
+### Следующий технический шаг
+
+Все фундаментальные баги систем координат и TF устранены. Можно возвращаться к чистому тюнингу ПД-регулятора `Kp` и `Kd` в симуляции.

@@ -9,6 +9,8 @@ rack_follower:
     base_speed: 0.3             # m/s forward speed during scanning
     max_error: 0.4              # lateral error at which speed = 0
     watchdog_timeout_ms: 200    # no cmd_vel → auto-hover
+    filter_z_min: -2.0
+    filter_z_max: 2.0
 
 px4_bridge:
   ros__parameters:

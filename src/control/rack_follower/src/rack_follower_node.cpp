@@ -19,6 +19,7 @@ RackFollower::RackFollower(const rclcpp::NodeOptions & options)
 {
   // --- Declare parameters (all from YAML) ---
   target_distance_     = declare_parameter("target_distance", 0.8);
+  base_target_distance_ = target_distance_;
   kp_                  = declare_parameter("kp", 0.5);
   kd_                  = declare_parameter("kd", 0.1);
   base_speed_          = declare_parameter("base_speed", 0.3);
@@ -44,7 +45,7 @@ RackFollower::RackFollower(const rclcpp::NodeOptions & options)
     .transient_local();
 
   // --- Publishers ---
-  cmd_vel_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>(
+  cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(
     "/drone/control/rack_follower/cmd_vel", cmd_qos);
 
   status_pub_ = create_publisher<std_msgs::msg::String>(
@@ -53,11 +54,26 @@ RackFollower::RackFollower(const rclcpp::NodeOptions & options)
   wall_dist_pub_ = create_publisher<std_msgs::msg::Float32>(
     "/drone/control/rack_follower/wall_distance", cmd_qos);
 
+  lateral_error_pub_ = create_publisher<std_msgs::msg::Float32>(
+    "/drone/control/rack_follower/lateral_error", cmd_qos);
+
   // --- Subscriber ---
   lidar_sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
     "/drone/perception/lidar/filtered", sensor_qos,
     [this](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
       on_lidar(std::move(msg));
+    });
+
+  dist_adjust_sub_ = create_subscription<std_msgs::msg::Float32>(
+    "/drone/perception/barcode/target_distance_adjust", cmd_qos,
+    [this](std_msgs::msg::Float32::ConstSharedPtr msg) {
+      on_distance_adjust(std::move(msg));
+    });
+
+  reset_dist_sub_ = create_subscription<std_msgs::msg::Bool>(
+    "/drone/control/rack_follower/reset_distance", cmd_qos,
+    [this](std_msgs::msg::Bool::ConstSharedPtr msg) {
+      on_reset_distance(std::move(msg));
     });
 
   // --- Watchdog timer: polls at 50 ms, triggers at watchdog_timeout_ms ---
@@ -90,6 +106,21 @@ void RackFollower::on_lidar(
 {
   lidar_alive_ = true;
   compute_control(*msg);
+}
+
+void RackFollower::on_distance_adjust(std_msgs::msg::Float32::ConstSharedPtr msg)
+{
+  target_distance_ += msg->data;
+  target_distance_ = std::clamp(target_distance_, 0.4, 1.4);
+  RCLCPP_INFO(this->get_logger(), "target_distance adjusted to %.2f m", target_distance_);
+}
+
+void RackFollower::on_reset_distance(std_msgs::msg::Bool::ConstSharedPtr msg)
+{
+  if (msg->data) {
+    target_distance_ = base_target_distance_;
+    RCLCPP_INFO(this->get_logger(), "target_distance reset to %.2f m", target_distance_);
+  }
 }
 
 void RackFollower::on_watchdog()
@@ -137,6 +168,10 @@ void RackFollower::compute_control(
   wall_dist_pub_->publish(dist_msg);
 
   if (!std::isfinite(measured)) {
+    auto error_msg = std_msgs::msg::Float32();
+    error_msg.data = std::numeric_limits<float>::quiet_NaN();
+    lateral_error_pub_->publish(error_msg);
+
     RCLCPP_WARN_THROTTLE(
       get_logger(), *get_clock(), 2000,
       "No valid wall points — publishing zero velocity");
@@ -149,6 +184,10 @@ void RackFollower::compute_control(
   // error = target_distance - measured_distance
   const double error = target_distance_ - measured;
   const double abs_error = std::abs(error);
+
+  auto error_msg = std_msgs::msg::Float32();
+  error_msg.data = static_cast<float>(error);
+  lateral_error_pub_->publish(error_msg);
 
   // PD: derivative term
   double derror_dt = 0.0;
@@ -258,15 +297,13 @@ double RackFollower::extract_wall_distance(
 
 void RackFollower::publish_cmd_vel(double vx, double vy)
 {
-  geometry_msgs::msg::TwistStamped msg;
-  msg.header.stamp    = now();
-  msg.header.frame_id = output_frame_id_;
-  msg.twist.linear.x  = vx;
-  msg.twist.linear.y  = vy;
-  msg.twist.linear.z  = 0.0;
-  msg.twist.angular.x = 0.0;
-  msg.twist.angular.y = 0.0;
-  msg.twist.angular.z = 0.0;
+  geometry_msgs::msg::Twist msg;
+  msg.linear.x  = vx;
+  msg.linear.y  = vy;
+  msg.linear.z  = 0.0;
+  msg.angular.x = 0.0;
+  msg.angular.y = 0.0;
+  msg.angular.z = 0.0;
   cmd_vel_pub_->publish(msg);
 }
 

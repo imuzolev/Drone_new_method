@@ -45,17 +45,25 @@ Px4Bridge::Px4Bridge(const rclcpp::NodeOptions & options)
     "/drone/control/px4_bridge/status", status_qos);
 
   // --- Subscribers ---
-  cmd_vel_sub_ = create_subscription<geometry_msgs::msg::TwistStamped>(
+  cmd_vel_sub_ = create_subscription<geometry_msgs::msg::Twist>(
     "/cmd_vel_out", cmd_qos,
-    [this](geometry_msgs::msg::TwistStamped::ConstSharedPtr msg) {
+    [this](geometry_msgs::msg::Twist::ConstSharedPtr msg) {
       on_cmd_vel(std::move(msg));
     });
 
   vehicle_status_sub_ = create_subscription<px4_msgs::msg::VehicleStatus>(
-    "/fmu/out/vehicle_status", px4_qos,
+    "/fmu/out/vehicle_status_v2", px4_qos,
     [this](px4_msgs::msg::VehicleStatus::ConstSharedPtr msg) {
       on_vehicle_status(std::move(msg));
     });
+
+  odometry_sub_ = create_subscription<px4_msgs::msg::VehicleOdometry>(
+    "/fmu/out/vehicle_odometry", px4_qos,
+    [this](px4_msgs::msg::VehicleOdometry::ConstSharedPtr msg) {
+      on_vehicle_odometry(std::move(msg));
+    });
+
+  tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
   // 50 Hz control loop — PX4 requires continuous setpoint stream
   control_timer_ = create_wall_timer(
@@ -80,12 +88,12 @@ Px4Bridge::Px4Bridge(const rclcpp::NodeOptions & options)
 // ============================================================
 
 void Px4Bridge::on_cmd_vel(
-  geometry_msgs::msg::TwistStamped::ConstSharedPtr msg)
+  geometry_msgs::msg::Twist::ConstSharedPtr msg)
 {
-  target_vx_       = msg->twist.linear.x;
-  target_vy_       = msg->twist.linear.y;
-  target_vz_       = msg->twist.linear.z;
-  target_yawspeed_ = msg->twist.angular.z;
+  target_vx_       = msg->linear.x;
+  target_vy_       = msg->linear.y;
+  target_vz_       = msg->linear.z;
+  target_yawspeed_ = msg->angular.z;
   last_cmd_vel_time_ = now();
   cmd_vel_received_  = true;
 }
@@ -94,6 +102,32 @@ void Px4Bridge::on_vehicle_status(
   px4_msgs::msg::VehicleStatus::ConstSharedPtr msg)
 {
   arming_state_.store(msg->arming_state);
+}
+
+void Px4Bridge::on_vehicle_odometry(
+  px4_msgs::msg::VehicleOdometry::ConstSharedPtr msg)
+{
+  geometry_msgs::msg::TransformStamped t;
+  t.header.stamp = get_clock()->now();
+  t.header.frame_id = "world";
+  t.child_frame_id = "base_link";
+  
+  // Позиция NED -> ENU
+  t.transform.translation.x = msg->position[1];
+  t.transform.translation.y = msg->position[0];
+  t.transform.translation.z = -msg->position[2];
+  
+  // Кватернион NED/FRD -> ENU/FLU
+  t.transform.rotation.w = msg->q[0];
+  t.transform.rotation.x = msg->q[2];
+  t.transform.rotation.y = msg->q[1];
+  t.transform.rotation.z = -msg->q[3];
+  
+  tf_broadcaster_->sendTransform(t);
+  
+  // Сохраняем текущий Yaw (в системе NED)
+  current_yaw_ned_ = atan2(2.0 * (msg->q[0] * msg->q[3] + msg->q[1] * msg->q[2]),
+                           1.0 - 2.0 * (msg->q[2] * msg->q[2] + msg->q[3] * msg->q[3]));
 }
 
 void Px4Bridge::on_control_timer()
@@ -162,10 +196,12 @@ void Px4Bridge::publish_setpoints()
   msg.timestamp = get_clock()->now().nanoseconds() / 1000;
 
   // ROS body (FLU) → PX4 local NED
-  // Phase 0 assumes heading ≈ north; proper tf2 transform in Phase 1
-  msg.velocity[0] = static_cast<float>(vx);     // forward  → north
-  msg.velocity[1] = static_cast<float>(-vy);    // left     → −east
-  msg.velocity[2] = static_cast<float>(-vz);    // up       → −down
+  double psi = current_yaw_ned_;
+
+  // Пересчет Body FLU -> Local NED
+  msg.velocity[0] = static_cast<float>(vx * cos(psi) + vy * sin(psi)); // North
+  msg.velocity[1] = static_cast<float>(vx * sin(psi) - vy * cos(psi)); // East
+  msg.velocity[2] = static_cast<float>(-vz);                           // Down
 
   // Unused axes: NaN = "don't care"
   msg.position[0]     = kNaN;
@@ -178,7 +214,10 @@ void Px4Bridge::publish_setpoints()
   msg.jerk[1]         = kNaN;
   msg.jerk[2]         = kNaN;
   msg.yaw             = kNaN;
-  msg.yawspeed        = static_cast<float>(target_yawspeed_);
+  
+  // Угловая скорость по Z напрямую передается (Body Z и NED D отличаются знаком)
+  // поэтому для поворота влево (ROS +Z) нужно отправить отрицательный yawspeed в PX4
+  msg.yawspeed        = static_cast<float>(-target_yawspeed_);
 
   traj_pub_->publish(msg);
 }

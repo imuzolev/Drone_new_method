@@ -14,21 +14,22 @@
 
 ## Текущий статус модулей
 
-| Модуль | Код | Собран | Протестирован |
-|--------|-----|--------|---------------|
-| rack_follower (C++) | готов | нет | нет |
-| px4_bridge (C++) | готов | нет | нет |
-| barcode_scanner + scan_policy_fsm (C++/Python) | готов | нет | нет |
-| twist_mux_config (YAML + launch) | готов | нет | нет |
-| lidar_preprocessor | скелет | нет | нет |
-| apriltag_detector | скелет | нет | нет |
-| fast_lio2_wrapper | скелет | нет | нет |
-| mission_manager | скелет | нет | нет |
-| nav2_config | скелет | нет | нет |
-| kpi_recorder | скелет | нет | нет |
-| SDF мир (warehouse_phase0.sdf) | готов | — | нет |
-| PNG штрихкоды в SDF | готов | — | нет |
-| Модель дрона x500_warehouse (LiDAR+cam) | готов | — | нет |
+| Модуль | Задача | Код | Собран | Протестирован | Заметки |
+|--------|--------|-----|--------|---------------|---------|
+| lidar_preprocessor | **B.1** ✅ | готов | ✅ | ✅ ~9Hz, 1196pts | TF2 world-frame фильтр добавлен |
+| drone_bringup (loop2.launch.py) | **B.2** ✅ | готов | ✅ | ✅ 4 ноды | use_sim_time пропагация через SetParameter |
+| rack_follower (C++) | B.3 | готов | нет | нет | ADJUSTING loop замкнут — проверить при тюнинге |
+| px4_bridge (C++) | B.3, B.4 | готов | нет | нет | — |
+| twist_mux_config (YAML + launch) | B.5 | готов | нет | нет | — |
+| barcode_scanner + scan_policy_fsm | C.3–C.5 | готов | нет | нет | зависимость от SLAM убрана |
+| SDF мир (warehouse_phase0.sdf) | C.2 | готов | — | нет | — |
+| PNG штрихкоды в SDF | C.1–C.2 | готов | — | нет | — |
+| Модель дрона x500_warehouse | A.8 ✅ | готов | — | ✅ | LiDAR+cam топики активны |
+| fast_lio2_wrapper | D.1 | скелет | нет | нет | — |
+| nav2_config | D.2 | скелет | нет | нет | — |
+| kpi_recorder | D.4 | скелет | нет | нет | — |
+| apriltag_detector | D.1+ | скелет | нет | нет | — |
+| mission_manager | E.1 | скелет | нет | нет | — |
 
 ---
 
@@ -96,16 +97,16 @@
 
 ## ФАЗА B: Контур 2 — Rack Follower в симуляции
 
-- [ ] **B.1** — Реализовать lidar_preprocessor
-  - Заполнить скелет `src/perception/lidar_preprocessor/`
-  - Нода: подписка на raw PointCloud2, фильтрация (ground removal + range crop + height band)
-  - Публикация на `/drone/perception/lidar/filtered` (PointCloud2)
-  - Config YAML с параметрами фильтров, launch файл
-  - **Проверка:** `ros2 topic echo /drone/perception/lidar/filtered --no-arr` показывает отфильтрованные данные
+- [x] ~~**B.1** — Реализовать lidar_preprocessor~~
+  - ~~Заполнить скелет `src/perception/lidar_preprocessor/`~~
+  - ~~Нода: подписка на raw PointCloud2, фильтрация (ground removal + range crop + height band)~~
+  - ~~Публикация на `/drone/perception/lidar/filtered` (PointCloud2)~~
+  - ~~Config YAML с параметрами фильтров, launch файл~~
+  - ~~**Проверка:** `ros2 topic echo /drone/perception/lidar/filtered --no-arr` показывает отфильтрованные данные~~ ✅ filtered ~9 Hz, 1196 pts
 
-- [ ] **B.2** — Единый launch файл для Loop 2
-  - Создать launch файл запускающий: lidar_preprocessor + rack_follower + twist_mux + px4_bridge
-  - **Проверка:** все 4 ноды стартуют, `ros2 node list` показывает их, статусы публикуются
+- [x] ~~**B.2** — Единый launch файл для Loop 2~~
+  - ~~Создать launch файл запускающий: lidar_preprocessor + rack_follower + twist_mux + px4_bridge~~
+  - ~~**Проверка:** все 4 ноды стартуют, `ros2 node list` показывает их, статусы публикуются~~ ✅ 4 ноды, 3 status топика + /diagnostics
 
 - [ ] **B.3** — Тюнинг PD-контроллера rack_follower
   - Запустить в Gazebo, наблюдать lateral_error через `ros2 topic echo`
@@ -150,7 +151,7 @@
 - [ ] **C.6** — Оценка качества считывания
   - Полный пролёт через проход, подсчитать считанные коды
   - Если < 5 из 24 — настроить: exposure камеры, LED подсветку в SDF, скорость дрона
-  - **Проверка:** ≥ 5 штрихкодов считаны за один пролёт одной стороны
+  - **Проверка:** ≥10 из 24 слотов считаны (левая сторона)
 
 ---
 
@@ -235,6 +236,17 @@
   - success_rate > 0.80 → начать Phase 1 (Hardware-in-Loop)
   - success_rate ≤ 0.80 → определить узкое место через KPI, вернуться к соответствующей фазе
   - **Проверка:** решение задокументировано в `docs/phase0_report.md`
+
+---
+
+## Переход Phase 0 → Phase 1 (Hardware-in-Loop)
+
+Условия перехода (все должны быть выполнены):
+- [ ] Phase 0c go-критерий достигнут (success_rate ≥ 0.80)
+- [ ] Все 6 safety rules проверены в симуляции
+- [ ] Документированы failure modes (docs/failure_modes.md)
+- [ ] Выбран companion computer (минимум Jetson Orin Nano 8GB, не Jetson Nano)
+- [ ] LiDAR noise plugin включён и протестирован
 
 ---
 

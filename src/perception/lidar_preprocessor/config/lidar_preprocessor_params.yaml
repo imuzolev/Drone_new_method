@@ -1,0 +1,23 @@
+lidar_preprocessor_node:
+  ros__parameters:
+    # Input raw PointCloud2 (from ros_gz_bridge)
+    input_topic: "/drone/perception/lidar/raw/points"
+    # Output filtered PointCloud2 (consumed by rack_follower)
+    output_topic: "/drone/perception/lidar/filtered"
+
+    # Ground removal: discard points below this height [m]
+    # Drone hovers ~1.5m above floor; floor at z=0
+    z_ground_threshold: 0.05
+
+    # Ceiling removal: discard points above this height [m]
+    # Warehouse ceiling at ~5m
+    z_ceiling_threshold: 4.0
+
+    # Range crop [m] — discard points outside [min_range, max_range]
+    min_range: 0.45   # sensor blind spot and ignore own frame
+    max_range: 8.0    # rack aisle half-width ~1.2m, so 8m is generous
+
+    # TF transform: apply before z-filter so thresholds are in world frame
+    # Set to false to filter in sensor frame (fallback / debug)
+    use_tf_transform: true
+    target_frame: "world"

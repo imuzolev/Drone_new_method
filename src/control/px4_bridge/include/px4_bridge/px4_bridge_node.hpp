@@ -5,11 +5,14 @@
 #define PX4_BRIDGE__PX4_BRIDGE_NODE_HPP_
 
 #include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/twist_stamped.hpp>
+#include <geometry_msgs/msg/twist.hpp>
 #include <px4_msgs/msg/offboard_control_mode.hpp>
 #include <px4_msgs/msg/trajectory_setpoint.hpp>
 #include <px4_msgs/msg/vehicle_status.hpp>
+#include <px4_msgs/msg/vehicle_odometry.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 
 #include <atomic>
 #include <string>
@@ -24,8 +27,9 @@ public:
 
 private:
   // Callbacks — dispatch only (project rule)
-  void on_cmd_vel(geometry_msgs::msg::TwistStamped::ConstSharedPtr msg);
+  void on_cmd_vel(geometry_msgs::msg::Twist::ConstSharedPtr msg);
   void on_vehicle_status(px4_msgs::msg::VehicleStatus::ConstSharedPtr msg);
+  void on_vehicle_odometry(px4_msgs::msg::VehicleOdometry::ConstSharedPtr msg);
   void on_control_timer();
   void on_status_timer();
 
@@ -44,8 +48,12 @@ private:
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
 
   // Subscribers
-  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_vel_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
   rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_sub_;
+  rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odometry_sub_;
+
+  // TF Broadcaster
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   // Timers
   rclcpp::TimerBase::SharedPtr control_timer_;
@@ -61,6 +69,7 @@ private:
   double target_vy_{0.0};
   double target_vz_{0.0};
   double target_yawspeed_{0.0};
+  double current_yaw_ned_{0.0};
 
   rclcpp::Time last_cmd_vel_time_;
   std::atomic<uint8_t> arming_state_{0};

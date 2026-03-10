@@ -20,7 +20,7 @@ from enum import Enum, auto
 from typing import Optional
 
 import rclpy
-from geometry_msgs.msg import PoseWithCovarianceStamped, TwistStamped
+from geometry_msgs.msg import TwistStamped
 from rclpy.node import Node
 from rclpy.qos import (
     DurabilityPolicy,
@@ -28,7 +28,7 @@ from rclpy.qos import (
     QoSProfile,
     ReliabilityPolicy,
 )
-from std_msgs.msg import Float32, String
+from std_msgs.msg import Float32, String, Bool
 
 from barcode_scanner.slot_kpi import SlotKPI, SlotKPIWriter
 
@@ -61,12 +61,12 @@ class ScanPolicyFSM(Node):
             "hover_duration_sec", 2.0).value
         self._p_adjust_step: float = self.declare_parameter(
             "adjust_step_m", 0.1).value
-        self._p_aisle_end: float = self.declare_parameter(
-            "aisle_end_x", 9.0).value
-        self._p_aisle_start: float = self.declare_parameter(
-            "aisle_start_x", -9.0).value
-        self._p_slot_width: float = self.declare_parameter(
-            "slot_width_m", 1.5).value
+        self._p_aisle_length: float = self.declare_parameter(
+            "aisle_length_m", 18.0).value
+        self._p_section_step: float = self.declare_parameter(
+            "section_step_m", 1.5).value
+        self._p_scan_side: str = self.declare_parameter(
+            "scan_side", "L").value
         self._p_aisle_id: str = self.declare_parameter(
             "aisle_id", "aisle_0").value
         self._p_stable_dur: float = self.declare_parameter(
@@ -100,6 +100,8 @@ class ScanPolicyFSM(Node):
             String, "/drone/perception/barcode/status", status_qos)
         self._pub_adjust = self.create_publisher(
             Float32, "/drone/perception/barcode/target_distance_adjust", cmd_qos)
+        self._pub_reset_dist = self.create_publisher(
+            Bool, "/drone/control/rack_follower/reset_distance", cmd_qos)
 
         # ── subscribers (callbacks = dispatch only) ─────────────────────
         self.create_subscription(
@@ -112,8 +114,8 @@ class ScanPolicyFSM(Node):
             Float32, "/drone/control/rack_follower/wall_distance",
             self._on_wall_dist, sensor_qos)
         self.create_subscription(
-            PoseWithCovarianceStamped, "/drone/slam/pose",
-            self._on_pose, sensor_qos)
+            TwistStamped, "/drone/control/rack_follower/cmd_vel",
+            self._on_cmd_vel, sensor_qos)
 
         # ── timers ──────────────────────────────────────────────────────
         self.create_timer(1.0 / fsm_hz, self._tick)
@@ -124,7 +126,10 @@ class ScanPolicyFSM(Node):
         self._rack_status: str = "FAILED"
         self._rack_stable_since: Optional[float] = None
         self._wall_dist: float = float("inf")
-        self._drone_x: float = self._p_aisle_start
+        
+        self._accumulated_distance_m: float = 0.0
+        self._last_cmd_vel_t: Optional[float] = None
+        self._approach_reset_sent: bool = False
 
         self._slot_idx: int = -1
         self._slot_attempts: int = 0
@@ -168,8 +173,19 @@ class ScanPolicyFSM(Node):
     def _on_wall_dist(self, msg: Float32) -> None:
         self._wall_dist = msg.data
 
-    def _on_pose(self, msg: PoseWithCovarianceStamped) -> None:
-        self._drone_x = msg.pose.pose.position.x
+    def _on_cmd_vel(self, msg: TwistStamped) -> None:
+        if self._state == State.APPROACH:
+            self._accumulated_distance_m = 0.0
+            self._last_cmd_vel_t = self._now_sec()
+            return
+        
+        now_t = self._now_sec()
+        if self._last_cmd_vel_t is not None:
+            dt = now_t - self._last_cmd_vel_t
+            if 0.0 < dt < 1.0:
+                # integrate x velocity to track distance along aisle
+                self._accumulated_distance_m += abs(msg.twist.linear.x) * dt
+        self._last_cmd_vel_t = now_t
 
     def _publish_status(self) -> None:
         msg = String()
@@ -193,25 +209,32 @@ class ScanPolicyFSM(Node):
     # ── APPROACH ────────────────────────────────────────────────────────
 
     def _tick_approach(self) -> None:
+        if not self._approach_reset_sent:
+            msg = Bool()
+            msg.data = True
+            self._pub_reset_dist.publish(msg)
+            self._approach_reset_sent = True
+            self._accumulated_distance_m = 0.0
+
         if self._rack_stable_since is None:
             return
         if self._now_sec() - self._rack_stable_since >= self._p_stable_dur:
             self.get_logger().info("Rack follower stable → SCANNING")
             self._state = State.SCANNING
-            self._enter_slot(self._pos_to_slot(self._drone_x))
+            self._enter_slot(self._pos_to_slot())
 
     # ── SCANNING ────────────────────────────────────────────────────────
 
     def _tick_scanning(self) -> None:
         # Aisle end check
-        if self._drone_x >= self._p_aisle_end:
+        if self._accumulated_distance_m > self._p_aisle_length - 0.5:
             self._finalize_slot(
                 "SUCCESS" if self._best_det else "PARTIAL")
             self._go_done()
             return
 
         # Slot tracking
-        new_slot = self._pos_to_slot(self._drone_x)
+        new_slot = self._pos_to_slot()
         if new_slot != self._slot_idx and new_slot >= 0:
             if self._slot_idx >= 0:
                 status = "SUCCESS" if self._best_det else "PARTIAL"
@@ -308,7 +331,7 @@ class ScanPolicyFSM(Node):
         if self._slot_idx < 0:
             return
         time_spent = self._now_sec() - self._slot_start_t
-        slot_id = f"L_{self._slot_idx + 1}"
+        slot_id = f"{self._p_scan_side}_{self._slot_idx + 1}"
 
         bc_val = self._best_det.get("barcode_value", "") if self._best_det else ""
         conf = self._best_det.get("confidence", 0.0) if self._best_det else 0.0
@@ -332,6 +355,9 @@ class ScanPolicyFSM(Node):
 
     def _go_done(self) -> None:
         self._state = State.DONE
+        msg = Bool()
+        msg.data = True
+        self._pub_reset_dist.publish(msg)
         self.get_logger().info(
             f"Aisle {self._p_aisle_id} DONE — KPI → {self._kpi.filepath}")
 
@@ -342,9 +368,9 @@ class ScanPolicyFSM(Node):
     def _now_sec(self) -> float:
         return self.get_clock().now().nanoseconds / 1e9
 
-    def _pos_to_slot(self, x: float) -> int:
-        idx = int((x - self._p_aisle_start) / self._p_slot_width)
-        return max(0, min(idx, 11))
+    def _pos_to_slot(self) -> int:
+        idx = int(self._accumulated_distance_m / self._p_section_step)
+        return idx
 
     def _eval_quality(self) -> float:
         if not self._det_fresh or self._last_det is None:

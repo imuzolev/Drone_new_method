@@ -1,0 +1,41 @@
+---
+description: Общие правила проекта — три контура (Survival/Inspection/Relocalization), стиль кода, Phase 0 MVP
+alwaysApply: true
+---
+
+# Drone New Method — General Rules
+
+## Проект
+Автономный дрон для инвентаризации склада. Gazebo Harmonic + PX4 SITL + ROS 2 Humble.
+WSL2 Ubuntu 22.04. Текущая фаза: Phase 0 MVP.
+MVP-цель: пролететь один проход 18м, считать ≥80% штрихкодов, вернуться на старт.
+
+## WSL2 доступ
+- Дистрибутив: Ubuntu-22.04
+- Логин: imuzolev
+- Пароль: 1111
+- Вход: `wsl -d Ubuntu-22.04 -u imuzolev`
+- Для root-команд: `echo 1111 | sudo -S <команда>`
+- Корень проекта в WSL: `/mnt/c/CORTEXIS/Drone_new_method`
+- PX4 каталог: `/home/imuzolev/PX4-Autopilot`
+
+## Три контура — НИКОГДА не смешивать
+- Loop 1 Survival: PX4 + TOF → не падать
+- Loop 2 Inspection: LiDAR rack-follower + scan policy → читать коды
+- Loop 3 Relocalization: FAST-LIO2 + barcode factors → знать позицию
+
+## Правила кода
+- C++: Google style, clang-format. Python: ruff, type hints обязательны
+- Все параметры через YAML, никаких magic numbers в коде
+- Каждая нода публикует `/node_name/status` (std_msgs/String: OK/DEGRADED/FAILED)
+- Бизнес-логика никогда в ROS callbacks — только dispatch
+
+## Phase 0: НЕ реализовывать
+UWB docking, GTSAM factor graph, aisle graph extraction, NvDLA оптимизация — это Phase 1+.
+Если нужен полный контекст — запроси @CONTEXT.md
+
+## Логи проекта: result.md и errors.md
+- После завершения фазы/крупной задачи — записать итог в `result.md`
+- **Перед поиском решения ошибки — сначала проверить `errors.md`**
+- Новые ошибки: формат `ERR-NNN`, поля: Дата, Фаза, Критичность, Симптом, Причина, Решение, Файлы, Урок
+- Нумерация сквозная, не сбрасывать между фазами

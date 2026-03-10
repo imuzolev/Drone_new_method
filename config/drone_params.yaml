@@ -1,0 +1,27 @@
+# Drone New Method — Drone Parameters (Phase 0)
+# All tunable parameters in one place. No magic numbers in code.
+
+rack_follower:
+  ros__parameters:
+    target_distance: 0.8        # meters from rack face
+    kp: 0.5                     # proportional gain (tune)
+    kd: 0.1                     # derivative gain (tune)
+    base_speed: 0.3             # m/s forward speed during scanning
+    max_error: 0.4              # lateral error at which speed = 0
+    watchdog_timeout_ms: 200    # no cmd_vel → auto-hover
+
+px4_bridge:
+  ros__parameters:
+    offboard_rate_hz: 50.0
+    watchdog_timeout_ms: 200
+    hover_altitude: 1.0         # meters AGL
+
+battery_budget:
+  ros__parameters:
+    flight_power_w: 120.0
+    hover_power_w: 100.0
+    return_speed: 2.0           # m/s
+    battery_capacity_wh: 22.2
+    safety_margin_pct: 5.0
+    max_threshold_pct: 40.0
+    recompute_interval_sec: 5.0

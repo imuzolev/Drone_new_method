@@ -1,0 +1,5 @@
+# Placeholder config for Phase 0 package skeleton.
+# Real detector parameters will be added when the package is implemented.
+apriltag_detector:
+  ros__parameters:
+    enabled: false

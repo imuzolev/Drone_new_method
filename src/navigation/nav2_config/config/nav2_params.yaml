@@ -1,0 +1,5 @@
+# Placeholder Nav2 config for Phase 0 package skeleton.
+# Transit tuning will be added in task D.2.
+nav2_config:
+  ros__parameters:
+    enabled: false

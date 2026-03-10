@@ -1,0 +1,13 @@
+---
+description: Всегда использовать виртуальное окружение для Python; создавать и активировать перед установкой и запуском
+alwaysApply: true
+---
+
+# Global Virtual Environment Rule
+
+1. **Always Use a Virtual Environment**: Never install dependencies globally. All dependencies MUST be installed inside a virtual environment (e.g. `venv`, `.venv`).
+2. **Create if Missing**: If a virtual environment does not exist in the project, it must be created before installing anything.
+3. **Always Activate**: Before running any terminal commands (scripts, installations, tests), verify that the virtual environment is activated.
+   - Example (Windows): `.\.venv\Scripts\activate`
+   - Example (Unix/WSL): `source .venv/bin/activate`
+4. Do not proceed with execution if the virtual environment is not active.

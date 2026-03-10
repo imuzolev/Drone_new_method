@@ -1,0 +1,28 @@
+---
+description: ROS 2 конвенции — топики, QoS, именование пакетов и нод
+alwaysApply: true
+---
+
+# ROS 2 Conventions
+
+## Топики
+/drone/control/rack_follower/cmd_vel      # TwistStamped
+/drone/control/rack_follower/status       # String: OK/DEGRADED/FAILED
+/drone/perception/barcode/detections      # BarcodeDetection.msg
+/drone/perception/barcode/scan_quality    # Float32 (0.0–1.0)
+/drone/perception/lidar/filtered          # PointCloud2
+/drone/slam/pose                          # PoseWithCovarianceStamped
+/drone/mission/state                      # String
+/drone/telemetry/kpi                      # MissionKPI.msg
+/drone/safety/battery_budget             # Float32
+
+## QoS
+- Сенсоры: BEST_EFFORT, VOLATILE, depth=5
+- Команды: RELIABLE, VOLATILE, depth=10
+- Карта/конфиг: RELIABLE, TRANSIENT_LOCAL, depth=1
+
+## Именование
+- Пакет: snake_case (rack_follower)
+- Класс ноды: PascalCase (RackFollower)
+- Launch файлы: Python (.launch.py), параметры из YAML
+- Все velocity commanders через twist_mux

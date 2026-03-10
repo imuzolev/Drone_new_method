@@ -1,0 +1,13 @@
+---
+description: Правила безопасности дрона — TOF, watchdog, локализация, батарея, конфликты SLAM/barcode
+alwaysApply: true
+---
+
+# Safety Rules — NEVER VIOLATE
+
+1. Collision avoidance не через сеть — TOF abort в PX4, не в ROS 2 топике
+2. Все velocity commands имеют watchdog timeout 200мс → при истечении автоховер
+3. Движение только при валидной локализации — проверять covariance перед стартом
+4. Battery threshold всегда динамический — f(distance_to_dock, speed, power), никогда статический %
+5. Barcode противоречит SLAM и оба уверены → СТОП, не лететь, ждать оператора
+6. Любое необработанное исключение в mission logic → hover + alert, никогда не продолжать

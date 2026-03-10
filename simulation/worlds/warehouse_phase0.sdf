@@ -1,0 +1,1049 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <world name="warehouse_phase0">
+
+    <!-- ФИЗИКА -->
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <!-- ПЛАГИНЫ -->
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+
+    <!-- ОСВЕЩЕНИЕ: 3 точечных лампы под потолком + ambient fill -->
+    <light name="lamp_start" type="point">
+      <pose>-5 0 7.5 0 0 0</pose><cast_shadows>true</cast_shadows><intensity>1.1</intensity>
+      <diffuse>0.95 0.95 0.9 1</diffuse><specular>0.3 0.3 0.3 1</specular>
+      <attenuation><range>16</range><constant>0.3</constant><linear>0.02</linear><quadratic>0.005</quadratic></attenuation>
+    </light>
+    <light name="lamp_center" type="point">
+      <pose>0 0 7.5 0 0 0</pose><cast_shadows>false</cast_shadows><intensity>1.0</intensity>
+      <diffuse>0.9 0.9 0.85 1</diffuse><specular>0.2 0.2 0.2 1</specular>
+      <attenuation><range>16</range><constant>0.3</constant><linear>0.02</linear><quadratic>0.005</quadratic></attenuation>
+    </light>
+    <light name="lamp_end" type="point">
+      <pose>5 0 7.5 0 0 0</pose><cast_shadows>false</cast_shadows><intensity>1.0</intensity>
+      <diffuse>0.9 0.9 0.85 1</diffuse><specular>0.2 0.2 0.2 1</specular>
+      <attenuation><range>16</range><constant>0.3</constant><linear>0.02</linear><quadratic>0.005</quadratic></attenuation>
+    </light>
+    <light name="ambient_fill" type="directional">
+      <pose>0 0 10 0 0 0</pose><cast_shadows>false</cast_shadows><intensity>0.35</intensity>
+      <direction>0 0 -1</direction><diffuse>0.55 0.55 0.55 1</diffuse><specular>0.05 0.05 0.05 1</specular>
+    </light>
+
+    <!-- ПОЛ 25x12м -->
+    <model name="floor"><static>true</static><pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>25 12 0.1</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>25 12 0.1</size></box></geometry>
+          <material><ambient>0.35 0.35 0.35 1</ambient><diffuse>0.45 0.45 0.45 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ПОТОЛОК на высоте 8м -->
+    <model name="ceiling"><static>true</static><pose>0 0 8 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>25 12 0.1</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>25 12 0.1</size></box></geometry>
+          <material><ambient>0.55 0.55 0.55 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!--
+      ГЕОМЕТРИЯ ПРОХОДА:
+      Длина: 18м (X от -9 до +9)
+      Ширина: 2.8м
+      Левый стеллаж: Y_фронт = +1.45, Y_зад = +2.95
+      Правый стеллаж: Y_фронт = -1.45, Y_зад = -2.95
+      Высота стеллажей: 4.0м
+      Секции: 12 x 1.5м (центры: ±8.25, ±6.75, ±5.25, ±3.75, ±2.25, ±0.75)
+      Стойки: 13 x 1.5м (X: -9,-7.5,-6,-4.5,-3,-1.5,0,1.5,3,4.5,6,7.5,9)
+      Полки: 4 уровня (Z: 0.8, 1.6, 2.4, 3.2м)
+      Штрихкоды: уровни 1 и 2 — высота сканирования дрона
+    -->
+
+    <!-- ===== ЛЕВЫЙ СТЕЛЛАЖ (Y > 0) ===== -->
+
+    <!-- Задняя стена левого стеллажа -->
+    <model name="rack_L_back"><static>true</static><pose>0 2.95 2.0 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>18.2 0.1 4.0</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>18.2 0.1 4.0</size></box></geometry>
+          <material><ambient>0.5 0.4 0.3 1</ambient><diffuse>0.55 0.45 0.35 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Горизонтальные полки левого стеллажа: 4 уровня -->
+    <model name="shelf_L1"><static>true</static><pose>0 1.7 0.8 0 0 0</pose><link name="l">
+      <collision name="c"><geometry><box><size>18 0.5 0.04</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>18 0.5 0.04</size></box></geometry>
+        <material><ambient>0.45 0.35 0.25 1</ambient><diffuse>0.5 0.4 0.3 1</diffuse></material></visual></link></model>
+    <model name="shelf_L2"><static>true</static><pose>0 1.7 1.6 0 0 0</pose><link name="l">
+      <collision name="c"><geometry><box><size>18 0.5 0.04</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>18 0.5 0.04</size></box></geometry>
+        <material><ambient>0.45 0.35 0.25 1</ambient><diffuse>0.5 0.4 0.3 1</diffuse></material></visual></link></model>
+    <model name="shelf_L3"><static>true</static><pose>0 1.7 2.4 0 0 0</pose><link name="l">
+      <collision name="c"><geometry><box><size>18 0.5 0.04</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>18 0.5 0.04</size></box></geometry>
+        <material><ambient>0.45 0.35 0.25 1</ambient><diffuse>0.5 0.4 0.3 1</diffuse></material></visual></link></model>
+    <model name="shelf_L4"><static>true</static><pose>0 1.7 3.2 0 0 0</pose><link name="l">
+      <collision name="c"><geometry><box><size>18 0.5 0.04</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>18 0.5 0.04</size></box></geometry>
+        <material><ambient>0.45 0.35 0.25 1</ambient><diffuse>0.5 0.4 0.3 1</diffuse></material></visual></link></model>
+
+    <!-- Стойки левого стеллажа: 13 шт x шаг 1.5м -->
+    <model name="pL0"> <static>true</static><pose>-9.0 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL1"> <static>true</static><pose>-7.5 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL2"> <static>true</static><pose>-6.0 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL3"> <static>true</static><pose>-4.5 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL4"> <static>true</static><pose>-3.0 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL5"> <static>true</static><pose>-1.5 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL6"> <static>true</static><pose> 0.0 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL7"> <static>true</static><pose> 1.5 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL8"> <static>true</static><pose> 3.0 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL9"> <static>true</static><pose> 4.5 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL10"><static>true</static><pose> 6.0 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL11"><static>true</static><pose> 7.5 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pL12"><static>true</static><pose> 9.0 1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+
+    <!-- Штрихкоды левого стеллажа — уровень 1 (Z=0.8м) -->
+            <model name="bcL_1_1"><static>true</static><pose>-8.25 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_01_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_2_1"><static>true</static><pose>-6.75 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_02_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_3_1"><static>true</static><pose>-5.25 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_03_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_4_1"><static>true</static><pose>-3.75 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_04_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_5_1"><static>true</static><pose>-2.25 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_05_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_6_1"><static>true</static><pose>-0.75 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_06_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_7_1"><static>true</static><pose>0.75 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_07_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_8_1"><static>true</static><pose>2.25 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_08_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_9_1"><static>true</static><pose>3.75 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_09_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_10_1"><static>true</static><pose>5.25 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_10_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_11_1"><static>true</static><pose>6.75 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_11_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_12_1"><static>true</static><pose>8.25 1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_12_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Штрихкоды левого стеллажа — уровень 2 (Z=1.6м) -->
+            <model name="bcL_1_2"><static>true</static><pose>-8.25 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_01_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_2_2"><static>true</static><pose>-6.75 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_02_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_3_2"><static>true</static><pose>-5.25 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_03_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_4_2"><static>true</static><pose>-3.75 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_04_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_5_2"><static>true</static><pose>-2.25 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_05_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_6_2"><static>true</static><pose>-0.75 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_06_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_7_2"><static>true</static><pose>0.75 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_07_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_8_2"><static>true</static><pose>2.25 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_08_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_9_2"><static>true</static><pose>3.75 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_09_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_10_2"><static>true</static><pose>5.25 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_10_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_11_2"><static>true</static><pose>6.75 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_11_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcL_12_2"><static>true</static><pose>8.25 1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_L_12_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== ПРАВЫЙ СТЕЛЛАЖ (Y < 0) ===== -->
+
+    <model name="rack_R_back"><static>true</static><pose>0 -2.95 2.0 0 0 0</pose>
+      <link name="link">
+        <collision name="col"><geometry><box><size>18.2 0.1 4.0</size></box></geometry></collision>
+        <visual name="vis"><geometry><box><size>18.2 0.1 4.0</size></box></geometry>
+          <material><ambient>0.5 0.4 0.3 1</ambient><diffuse>0.55 0.45 0.35 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="shelf_R1"><static>true</static><pose>0 -1.7 0.8 0 0 0</pose><link name="l">
+      <collision name="c"><geometry><box><size>18 0.5 0.04</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>18 0.5 0.04</size></box></geometry>
+        <material><ambient>0.45 0.35 0.25 1</ambient><diffuse>0.5 0.4 0.3 1</diffuse></material></visual></link></model>
+    <model name="shelf_R2"><static>true</static><pose>0 -1.7 1.6 0 0 0</pose><link name="l">
+      <collision name="c"><geometry><box><size>18 0.5 0.04</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>18 0.5 0.04</size></box></geometry>
+        <material><ambient>0.45 0.35 0.25 1</ambient><diffuse>0.5 0.4 0.3 1</diffuse></material></visual></link></model>
+    <model name="shelf_R3"><static>true</static><pose>0 -1.7 2.4 0 0 0</pose><link name="l">
+      <collision name="c"><geometry><box><size>18 0.5 0.04</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>18 0.5 0.04</size></box></geometry>
+        <material><ambient>0.45 0.35 0.25 1</ambient><diffuse>0.5 0.4 0.3 1</diffuse></material></visual></link></model>
+    <model name="shelf_R4"><static>true</static><pose>0 -1.7 3.2 0 0 0</pose><link name="l">
+      <collision name="c"><geometry><box><size>18 0.5 0.04</size></box></geometry></collision>
+      <visual name="v"><geometry><box><size>18 0.5 0.04</size></box></geometry>
+        <material><ambient>0.45 0.35 0.25 1</ambient><diffuse>0.5 0.4 0.3 1</diffuse></material></visual></link></model>
+
+    <!-- Стойки правого стеллажа: 13 шт -->
+    <model name="pR0"> <static>true</static><pose>-9.0 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR1"> <static>true</static><pose>-7.5 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR2"> <static>true</static><pose>-6.0 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR3"> <static>true</static><pose>-4.5 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR4"> <static>true</static><pose>-3.0 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR5"> <static>true</static><pose>-1.5 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR6"> <static>true</static><pose> 0.0 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR7"> <static>true</static><pose> 1.5 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR8"> <static>true</static><pose> 3.0 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR9"> <static>true</static><pose> 4.5 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR10"><static>true</static><pose> 6.0 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR11"><static>true</static><pose> 7.5 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+    <model name="pR12"><static>true</static><pose> 9.0 -1.72 2.0 0 0 0</pose><link name="l"><collision name="c"><geometry><box><size>0.08 0.08 4.0</size></box></geometry></collision><visual name="v"><geometry><box><size>0.08 0.08 4.0</size></box></geometry><material><ambient>0.25 0.25 0.25 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material></visual></link></model>
+
+    <!-- Штрихкоды правого стеллажа — уровень 1 (Z=0.8м) -->
+            <model name="bcR_1_1"><static>true</static><pose>-8.25 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_01_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_2_1"><static>true</static><pose>-6.75 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_02_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_3_1"><static>true</static><pose>-5.25 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_03_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_4_1"><static>true</static><pose>-3.75 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_04_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_5_1"><static>true</static><pose>-2.25 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_05_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_6_1"><static>true</static><pose>-0.75 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_06_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_7_1"><static>true</static><pose>0.75 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_07_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_8_1"><static>true</static><pose>2.25 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_08_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_9_1"><static>true</static><pose>3.75 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_09_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_10_1"><static>true</static><pose>5.25 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_10_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_11_1"><static>true</static><pose>6.75 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_11_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_12_1"><static>true</static><pose>8.25 -1.43 0.8 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_12_1.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Штрихкоды правого стеллажа — уровень 2 (Z=1.6м) -->
+            <model name="bcR_1_2"><static>true</static><pose>-8.25 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_01_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_2_2"><static>true</static><pose>-6.75 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_02_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_3_2"><static>true</static><pose>-5.25 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_03_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_4_2"><static>true</static><pose>-3.75 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_04_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_5_2"><static>true</static><pose>-2.25 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_05_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_6_2"><static>true</static><pose>-0.75 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_06_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_7_2"><static>true</static><pose>0.75 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_07_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_8_2"><static>true</static><pose>2.25 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_08_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_9_2"><static>true</static><pose>3.75 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_09_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_10_2"><static>true</static><pose>5.25 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_10_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_11_2"><static>true</static><pose>6.75 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_11_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+            <model name="bcR_12_2"><static>true</static><pose>8.25 -1.43 1.6 0 0 0</pose>
+      <link name="l">
+        <visual name="v">
+          <geometry><box><size>0.12 0.005 0.07</size></box></geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>/home/imuzolev/gz_barcodes/barcode_R_12_2.png</albedo_map>
+                <metalness>0.0</metalness>
+                <roughness>1.0</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ДРОН: PX4 спавнит x500_warehouse автоматически через gz_bridge.
+         Старт: X=-9.0, Y=0.0, Z=0.2 (на земле, PX4 поднимет при arm).
+         Запуск: PX4_GZ_WORLD=warehouse_phase0 PX4_GZ_MODEL_POSE="-9,0,0.2,0,0,0" make px4_sitl gz_x500_warehouse
+         Сенсоры: 3D LiDAR (/drone/perception/lidar/raw), камера (/drone/camera/image_raw) -->
+
+    <!-- AprilTag dock маркер на полу у старта (X=-9.5) -->
+    <model name="dock_apriltag"><static>true</static><pose>-9.5 0 0.06 0 0 0</pose>
+      <link name="link">
+        <visual name="vis"><geometry><box><size>0.4 0.4 0.01</size></box></geometry>
+          <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

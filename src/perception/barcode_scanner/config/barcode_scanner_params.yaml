@@ -1,0 +1,29 @@
+# ── barcode_scanner_node (C++) ───────────────────────────────────────────────
+barcode_scanner_node:
+  ros__parameters:
+    camera_topic: "/drone/camera/image_raw"
+    skip_frames: 0                # 0 = decode every frame; 2 = every 3rd frame
+
+# ── scan_policy_fsm_node (Python) ───────────────────────────────────────────
+scan_policy_fsm_node:
+  ros__parameters:
+    # --- quality & retry ---
+    scan_quality_threshold: 0.6   # below this → HOVER_SCAN (Section 5.2)
+    max_attempts: 6               # total per slot before MANUAL_REVIEW
+    hover_attempts_before_adjust: 3
+    hover_duration_sec: 2.0       # seconds to hover per attempt
+    adjust_step_m: 0.1            # ±distance change in ADJUSTING state
+    min_slot_dwell_sec: 1.0       # wait before judging scan quality
+
+    # --- aisle geometry ---
+    aisle_start_x: -9.0
+    aisle_end_x: 9.0
+    slot_width_m: 1.5
+    aisle_id: "aisle_0"
+
+    # --- approach ---
+    stable_duration_sec: 1.0      # rack_follower OK for this long → SCANNING
+
+    # --- runtime ---
+    fsm_rate_hz: 10.0
+    kpi_output_dir: "/tmp/Drone_new_method/kpi"

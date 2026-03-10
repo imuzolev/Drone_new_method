@@ -1,0 +1,32 @@
+# twist_mux velocity arbitration — priority-based command multiplexer
+# Higher priority topics override lower ones when actively publishing.
+# All inputs/output: geometry_msgs/msg/TwistStamped
+
+twist_mux:
+  ros__parameters:
+    topics:
+      safety:
+        topic: /drone/safety/cmd_vel
+        timeout: 0.5
+        priority: 100
+
+      barcode_hover:
+        topic: /drone/perception/barcode/cmd_vel
+        timeout: 0.5
+        priority: 50
+
+      rack_follower:
+        topic: /drone/control/rack_follower/cmd_vel
+        timeout: 0.5
+        priority: 30
+
+      navigation:
+        topic: /drone/navigation/nav2/cmd_vel
+        timeout: 0.5
+        priority: 10
+
+    locks:
+      e_stop:
+        topic: /drone/safety/e_stop
+        timeout: 0.0
+        priority: 255

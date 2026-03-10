@@ -1,0 +1,13 @@
+# Drone New Method — SLAM Parameters (Phase 0)
+# FAST-LIO2 configuration for warehouse environment
+
+fast_lio2_wrapper:
+  ros__parameters:
+    lidar_topic: "/drone/perception/lidar/filtered"
+    imu_topic: "/fmu/out/vehicle_imu"
+    map_frame: "map"
+    body_frame: "base_link"
+    max_iteration: 3
+    filter_size_map: 0.3        # voxel grid filter for map points
+    filter_size_surf: 0.5
+    covariance_trace_threshold: 0.5  # above this → SLAM uncertain

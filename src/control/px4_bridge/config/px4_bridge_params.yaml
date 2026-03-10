@@ -1,0 +1,8 @@
+px4_bridge_node:
+  ros__parameters:
+    # --- Velocity limits (clamp before sending to PX4) ---
+    max_velocity_xy: 2.0        # m/s horizontal plane
+    max_velocity_z: 1.0         # m/s vertical
+
+    # --- Watchdog (safety_rules.mdc RULE 2) ---
+    watchdog_timeout_ms: 200    # no cmd_vel → hover setpoint after this

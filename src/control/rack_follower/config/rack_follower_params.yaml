@@ -1,0 +1,22 @@
+rack_follower_node:
+  ros__parameters:
+    # --- PD controller (Section 5.1) ---
+    target_distance: 0.8      # metres from rack face
+    kp: 0.5                   # proportional gain — start here, tune down if oscillations
+    kd: 0.1                   # derivative gain  — damps oscillations
+    base_speed: 0.3           # m/s forward during scanning
+    max_error: 0.4            # lateral error at which forward speed = 0
+
+    # --- Safety (safety_rules.mdc RULE 2) ---
+    watchdog_timeout_ms: 200  # no LiDAR → zero velocity after this
+
+    # --- Wall selection ---
+    follow_left: true         # true = follow left rack (Y > 0)
+
+    # --- Point cloud filter ---
+    filter_z_min: 0.3         # metres — drop floor returns
+    filter_z_max: 3.5         # metres — drop ceiling returns
+    filter_x_range: 2.0       # metres — only points within ±2 m forward of drone
+
+    # --- Output frame ---
+    output_frame_id: "base_link"
